@@ -1,0 +1,17 @@
+---
+title: "Milestone Report"
+author: "Andy Dyck"
+date: '2016-11-27'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Initial Investigation 
+
+## Summary of the three files
+
+
+
