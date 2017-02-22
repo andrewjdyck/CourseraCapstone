@@ -1,0 +1,61 @@
+
+# Exploratory Data Analysis
+```{r, message=FALSE}
+# loads packages
+library(tidytext)
+library(dplyr)
+library(tidyr)
+library(tibble)
+```
+```{r, echo=FALSE}
+d <- read.csv('./WriteOffs.csv', stringsAsFactors = FALSE, encoding = 'latin1') %>%
+  as_tibble()
+data("stop_words")
+source('./helpers.R')
+```
+
+
+```{r}
+library(ggplot2)
+geog <- d[, c('REGION', 'FIELD', 'DISTRICT')]
+names(geog) <- tolower(names(geog))
+geog$region_num <- sapply(geog$region, num_locale)
+geog$district_num <- sapply(geog$district, num_locale)
+geog$field_num <- sapply(geog$field, num_locale)
+```
+
+# Plot adjustments 
+## By region
+```{r}
+c <- ggplot(geog, aes(factor(region_num)))
+c + geom_bar() + ggtitle('Adjustments by Region')
+```
+
+## By District
+```{r}
+c <- ggplot(geog, aes(factor(district_num)))
+c + geom_bar() + ggtitle('Adjustments by District')
+```
+
+<!-- ## By Field Office -->
+<!-- ```{r} -->
+<!-- c <- ggplot(geog, aes(factor(field_num))) -->
+<!-- c + geom_bar() + ggtitle('Adjustments by Field Office') -->
+<!-- ``` -->
+
+# Count words in description
+```{r, echo=FALSE}
+# just the description field 
+# remove Quebec for now so I don't have to deal with french
+tidy_docs <- d[which(grepl('06', d$REGION)==FALSE), c('ID', 'DESCRIPTION')] %>%
+  setNames(c('id', 'text')) %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words)
+
+# count words
+tidy_docs %>%
+  count(word, sort = TRUE) 
+```
+
+
+

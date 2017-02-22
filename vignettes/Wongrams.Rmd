@@ -1,0 +1,68 @@
+
+---
+title: "Plotting Writeoff Ngrams"
+author: "A.Dyck"
+---
+
+```{r, echo=FALSE}
+library(tidytext)
+library(dplyr)
+library(tidyr)
+library(tibble)
+# Install packages for graphing
+# devtools::install_github('thomasp85/ggforce')
+# devtools::install_github('thomasp85/ggraph')
+```
+
+# Setup data
+```{r}
+adj <- read.csv('../data/Writeoffs.csv', stringsAsFactors = FALSE, encoding = 'latin1') %>%
+  tbl_df() %>%
+  filter(!grepl('06', REGION)) %>%
+  select(ID, DESCRIPTION) %>%
+  setNames(c('id', 'text'))
+
+data("stop_words")
+adj_words <- adj %>%
+  unnest_tokens(word, text) %>%
+  count(word, sort = TRUE) %>%
+  filter(!word %in% stop_words$word)
+
+
+```
+
+```{r}
+adj_2gram <- adj %>%
+  unnest_tokens(ngram, text, token="ngrams", n=2) %>%
+  separate(ngram, c("word1", "word2"), sep=" ") %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word)
+
+adj_2gram_count <- adj %>%
+  unnest_tokens(ngram, text, token="ngrams", n=2) %>%
+  count(ngram, sort=TRUE) %>%
+  separate(ngram, c("word1", "word2"), sep=" ") %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word,
+         n > 10)
+
+adj_2gram_count
+```
+
+# graph 2-ngram
+```{r}
+vertices <- adj_words %>%
+  filter(word %in% adj_2gram_count$word1 | word %in% adj_2gram_count$word2)
+
+library(ggraph)
+library(igraph)
+
+graph_from_data_frame(adj_2gram_count, vertices = vertices) %>%
+  ggraph(layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n), arrow = arrow(length = unit(.15, "inches"))) +
+  geom_node_point(aes(size = n), color = "lightblue") +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  scale_edge_alpha_continuous(trans = "log10") +
+  scale_size_continuous(range = c(1, 10)) +
+  theme_void()
+```

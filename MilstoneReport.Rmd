@@ -7,11 +7,248 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(tidyr)
+library(tidytext)
+library(knitr)
+library(ggplot2)
 ```
 
-# Initial Investigation 
+# Executive Summary
+```{r, echo=FALSE}
+data("stop_words")
+datadir <- '~/Downloads/CourseraCapstone/final/en_US/'
+filenames <- c('en_US.blogs.txt', 'en_US.news.txt', 'en_US.twitter.txt')
+```
 
-## Summary of the three files
+The following milestone report is prepared to mark progress towards analysis of three data files containing text samples from blogs, news sites, and twitter. The text will be used later in the Coursera Capstone project to build a text prediction algorithm for the Coursera partner SwiftKey.
 
+
+# Summary of the three files
+For a very preliminary analysis, I read in all three data files and count the number of lines and unique words. Then I also remove stop words from the tidytext package.
+```{r}
+b1 <- readLines(file(paste0(datadir, filenames[1]), "r")) %>%
+  tbl_df() %>%
+  setNames('text')
+n1 <- readLines(file(paste0(datadir, filenames[2]), "r")) %>%
+  tbl_df() %>%
+  setNames('text')
+t1 <- readLines(file(paste0(datadir, filenames[3]), "r")) %>%
+  tbl_df() %>%
+  setNames('text')
+
+bb <- b1 %>%
+  unnest_tokens(word, text)
+nn <- n1 %>%
+  unnest_tokens(word, text)
+tt <- t1 %>%
+  unnest_tokens(word, text)
+
+blogs_line_count <- b1 %>%
+  count()
+blogs_word_count <- bb %>%
+  count()
+blogs_nonstop_word_count <- bb %>%
+  anti_join(stop_words) %>%
+  count()
+
+news_line_count <- n1 %>%
+  count()
+news_word_count <- nn %>%
+  count()
+news_nonstop_word_count <- nn %>%
+  anti_join(stop_words) %>%
+  count()
+
+twit_line_count <- t1 %>%
+  count()
+twit_word_count <- tt %>%
+  count()
+twit_nonstop_word_count <- tt %>%
+  anti_join(stop_words) %>%
+  count()
+rm(list=c("b1", "n1", "t1", "bb", "nn", "tt"))
+
+outtable <- data.frame(
+  file.name = filenames,
+  line.count = c(blogs_line_count$n, news_line_count$n, twit_line_count$n),
+  word.count = c(blogs_word_count$n, news_word_count$n, twit_word_count$n),
+  non.stop.word.count = c(blogs_nonstop_word_count$n, news_nonstop_word_count$n, twit_nonstop_word_count$n)
+) %>%
+  tbl_df()
+write.csv(outtable, './Data/prelim_file_counts.csv', row.names = FALSE)
+outtable <- read.csv('./Data/prelim_file_counts.csv') %>%
+  tbl_df()
+kable(outtable, format.args = list(big.mark = ","))
+```
+The twitter dataset contains the largest number of lines, however, all three files are roughly similar in terms of word count and non-stop word counts. A quick scatter plot of the total word count and non-stop word count in each of the files is shown below.
+
+```{r}
+p1 <- ggplot(outtable, aes(x=word.count, y=non.stop.word.count, shape=file.name)) +
+  geom_point() 
+  # + geom_text(aes(label=file.name),hjust=0, vjust=0)
+p1
+```
+
+# Sample of data analysis
+Next step is to pare down the dataset to just a sample for easier exploratory data analysis. I'm going to read a sample of about 10% of the blogs dataset (100,000 lines) and for a simplifying assumption, I'm going to read the same number of lines from the other two datasets.
+
+I could also use `dplyr` to sample the dataset on read using `sample_frac` or `sample_n`, however, to keep I/O time down, I'm going to force the sampling on read. Both `sample_n` and `sample_frac` would read the whole file first and then reduce the dataset afterwards, which would be more computationally intensive from an I/O perspective.
+
+```{r, message=FALSE, warning=FALSE}
+SampleN <- 100000
+blogs <- readLines(file(paste0(datadir, filenames[1]), "r"), SampleN) %>% 
+  tbl_df() %>%
+  setNames('text') %>%
+  mutate(id=1:SampleN)
+news <- readLines(file(paste0(datadir, filenames[2]), "r"), SampleN) %>% 
+  tbl_df() %>%
+  setNames('text') %>%
+  mutate(id=1:SampleN)
+twit <- readLines(file(paste0(datadir, filenames[3]), "r"), SampleN) %>% 
+  tbl_df() %>%
+  setNames('text') %>%
+  mutate(id=1:SampleN)
+```
+
+After reading a sample of `r SampleN` lines from each of the data files, I do some preliminary analysis on each of the 3 files.
+
+## Blogs data
+Starting with the blogs data, I remove stop words and can see the top 10 words used in the sample of blog text. 
+```{r, warning=FALSE, message=FALSE}
+blog_words <- blogs %>%
+  unnest_tokens(word, text) %>%
+  count(word, sort = TRUE) %>%
+  ungroup() %>%
+  anti_join(stop_words) %>%
+  arrange(desc(n)) %>%
+  mutate(source='blogs')
+blog_words
+```
+
+Interesting to see the numbers 1 and 2 in the top 10 words, so I'll need to dig into that further and figure out what's happening with that. Are these truly references to the number or are they just from an ordered list in the blog text? Part of phone numbers?
+
+
+Next, I'll try looking at an N-gram on the blogs text data to look for some initial insight and any unique treatments that may be required.
+```{r}
+blogs_2gram_count <- blogs %>%
+  unnest_tokens(ngram, text, token="ngrams", n=2) %>%
+  count(ngram, sort=TRUE) %>%
+  separate(ngram, c("word1", "word2"), sep=" ") %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word,
+         n > 10) %>%
+  mutate(source='blogs')
+blogs_2gram_count
+```
+
+It's encouraging to see the N-gram "ice cream" show up, which is encouraging that the n-gram method used here is finding some genuine patterns. Interesting that this n-gram is the most popular in the sample though. Could this data be pulled from a non-random subset of blogs that focus on dairy? ;)
+
+I'm also starting to see some patterns with the numbers 1 & 2, especially when I see 3 & 4 following each other as well. My current hypothesis is that these are indeed from ordered lists within the blog text. 
+
+When building a text prediction model later, I'll have to deal with these numeric issues appropriately.
+
+## News data
+```{r, warning=FALSE, message=FALSE}
+news_words <- news %>%
+  unnest_tokens(word, text) %>%
+  count(word, sort = TRUE) %>%
+  ungroup() %>%
+  anti_join(stop_words) %>%
+  arrange(desc(n)) %>%
+  mutate(source='news')
+news_words
+```
+
+Interesting to see the word "time" once again in the top ten for the news data. Now let's try an N-gram for news.
+
+```{r, warning=FALSE, message=FALSE}
+news_2gram_count <- news %>%
+  unnest_tokens(ngram, text, token="ngrams", n=2) %>%
+  count(ngram, sort=TRUE) %>%
+  separate(ngram, c("word1", "word2"), sep=" ") %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word,
+         n > 10) %>%
+  mutate(source='news')
+news_2gram_count
+```
+
+## Twitter data
+```{r, warning=FALSE, message=FALSE}
+twit_words <- twit %>%
+  unnest_tokens(word, text) %>%
+  count(word, sort = TRUE) %>%
+  ungroup() %>%
+  anti_join(stop_words) %>%
+  arrange(desc(n)) %>%
+  mutate(source='twitter')
+twit_words
+```
+
+
+And, the n-gram for tweets is as follows:
+```{r, warning=FALSE, message=FALSE}
+twit_2gram_count <- twit %>%
+  unnest_tokens(ngram, text, token="ngrams", n=2) %>%
+  count(ngram, sort=TRUE) %>%
+  separate(ngram, c("word1", "word2"), sep=" ") %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word,
+         n > 10) %>%
+  mutate(source = 'twitter')
+twit_2gram_count
+```
+
+# Graphical analysis of data files
+Now let's combine the tokens and n-grams together to see some graphical analysis of the data.
+
+```{r, warning=FALSE, message=FALSE}
+all_words <- bind_rows(blog_words, news_words, twit_words) 
+all_word_count <- all_words %>%
+  group_by(word) %>% 
+  summarize(total = sum(n)) %>%
+  ungroup() %>%
+  arrange(desc(total)) %>%
+  top_n(30) %>%
+  inner_join(all_words)
+
+ggplot(all_word_count, aes(x=reorder(as.factor(word), total), y=n, fill=as.factor(source))) + 
+  geom_bar(stat="identity") + 
+  coord_flip()
+```
+
+Diving into the n-grams across all three files, we see some interesting patterns in the bar chart below. The top n-grams throughout all 3 files seem to be for some of the two-word city names such as St. Louis and L.A.
+
+
+```{r, warning=FALSE, message=FALSE}
+all_ngram <- bind_rows(blogs_2gram_count, news_2gram_count, twit_2gram_count) %>%
+  mutate(ngram = paste(word1, word2, sep=" "))
+
+all_ngram_count <- all_ngram %>%
+  group_by(ngram) %>% 
+  summarize(total = sum(n)) %>%
+  ungroup() %>%
+  arrange(desc(total)) %>%
+  top_n(30) %>%
+  inner_join(all_ngram)
+
+ggplot(all_ngram_count, aes(x=reorder(as.factor(ngram), total), y=n, fill=as.factor(source))) + 
+  geom_bar(stat="identity") + 
+  coord_flip()
+```
+
+People seem to really enjoy wishing one another Happy Birthday on twitter!
+
+# Next steps
+The next steps will be in two parts:
+
+## 1. Data cleaning
+I'll need to figure out how to deal with the times in the data. If I'm tokeninzing with the tidytext package, it doesn't look to be currently handling these well. That is, breaking the times up into separate words. 
+
+There will also need to be some more general cleanup of some of the blog and news data as there are some non-english items in there still as well as some non-text characters that tidytext hasn't filtered out.
+
+## 2. Prediction model
+As for the prediction model itself, the next steps will be to dive deeper into n-grams, looking at 3, 4 or more n-grams and saving these into rdata files for use in a back-off model.
 
 

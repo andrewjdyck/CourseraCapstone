@@ -1,23 +1,18 @@
 
-
-datadir <- 'C:/Users/dycka/Downloads/Coursera-SwiftKey/final/en_US/'
-#datadir <- '~/Downloads/CourseraCapstone/final/en_US/'
+library(dplyr)
+#datadir <- 'C:/Users/dycka/Downloads/Coursera-SwiftKey/final/en_US/'
+datadir <- '~/Downloads/CourseraCapstone/final/en_US/'
 filenames <- c('en_US.blogs.txt', 'en_US.news.txt', 'en_US.twitter.txt')
 
-
-
-
-
-
-conT <- file(paste0(datadir, filenames[3]), "r")
 conB <- file(paste0(datadir, filenames[1]), "r")
 conN <- file(paste0(datadir, filenames[2]), "r")
+conT <- file(paste0(datadir, filenames[3]), "r")
 
 # Read the data
 #tt <- readLines(conT, 10)
-dT <- readLines(conT)
-dB <- readLines(conB)
-dN <- readLines(conN)
+dB <- readLines(conB, 1000)
+dN <- readLines(conN, 1000)
+dT <- readLines(conT, 1000)
 
 
 
