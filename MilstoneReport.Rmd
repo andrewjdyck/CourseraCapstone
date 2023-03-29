@@ -17,7 +17,7 @@ library(ggplot2)
 # Executive Summary
 ```{r, echo=FALSE}
 data("stop_words")
-datadir <- '~/Downloads/CourseraCapstone/final/en_US/'
+datadir <- './Data/final/en_US/'
 filenames <- c('en_US.blogs.txt', 'en_US.news.txt', 'en_US.twitter.txt')
 ```
 
@@ -28,13 +28,13 @@ The following milestone report is prepared to mark progress towards analysis of 
 For a very preliminary analysis, I read in all three data files and count the number of lines and unique words. Then I also remove stop words from the tidytext package.
 ```{r}
 b1 <- readLines(file(paste0(datadir, filenames[1]), "r")) %>%
-  tbl_df() %>%
+  as_tibble() %>%
   setNames('text')
 n1 <- readLines(file(paste0(datadir, filenames[2]), "r")) %>%
-  tbl_df() %>%
+  as_tibble() %>%
   setNames('text')
 t1 <- readLines(file(paste0(datadir, filenames[3]), "r")) %>%
-  tbl_df() %>%
+  as_tibble() %>%
   setNames('text')
 
 bb <- b1 %>%
